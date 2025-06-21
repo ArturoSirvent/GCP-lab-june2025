@@ -1,8 +1,6 @@
 from flask import Flask, jsonify, request
 from google.cloud import storage
 from google.cloud import translate_v2 as translate
-import vertexai
-from vertexai.generative_models import GenerativeModel
 import os
 import json
 import logging
@@ -34,15 +32,6 @@ except Exception as e:
     logger.error(f"Error conectando a Translation API: {e}")
     translate_client = None
 
-# Inicializar Vertex AI para resúmenes
-try:
-    vertexai.init(project=PROJECT_ID, location="us-central1")
-    generative_model = GenerativeModel("gemini-1.5-flash")
-    logger.info("Cliente de Vertex AI inicializado")
-except Exception as e:
-    logger.error(f"Error conectando a Vertex AI: {e}")
-    generative_model = None
-
 @app.route('/health', methods=['GET'])
 def health_check():
     """Endpoint de salud para verificar que el servicio funciona"""
@@ -51,8 +40,7 @@ def health_check():
         'service': 'translator-storage-api',
         'bucket_configured': BUCKET_NAME is not None,
         'storage_client_ready': storage_client is not None,
-        'translation_client_ready': translate_client is not None,
-        'generative_model_ready': generative_model is not None
+        'translation_client_ready': translate_client is not None
     }
     return jsonify(status)
 
@@ -302,15 +290,14 @@ def get_info():
     """Información sobre el servicio y configuración"""
     return jsonify({
         'service': 'Translator Storage API',
-        'version': '2.1.0',
+        'version': '2.0.0',
         'bucket': BUCKET_NAME,
         'project': PROJECT_ID,
-        'features': ['storage', 'translation', 'summarization'],
+        'features': ['storage', 'translation'],
         'endpoints': {
             'health': '/health',
             'list_files': '/files',
             'get_file': '/file/<filename>?lang=<target_lang>&source=<source_lang>',
-            'summarize_file': '/summarize/<filename>?prompt=<custom_prompt>&max_length=<words>',
             'translate_direct': '/translate?text=<text>&target=<lang>&source=<lang>',
             'supported_languages': '/languages',
             'upload_file': '/upload (POST)',
@@ -320,8 +307,6 @@ def get_info():
             'list_files': f'{request.url_root}files',
             'get_file': f'{request.url_root}file/info.json',
             'get_file_translated': f'{request.url_root}file/welcome.txt?lang=es',
-            'summarize_file': f'{request.url_root}summarize/welcome.txt',
-            'summarize_with_prompt': f'{request.url_root}summarize/info.json?prompt=Enfócate en las características técnicas&max_length=100',
             'translate_text': f'{request.url_root}translate?text=Hello World&target=es',
             'health_check': f'{request.url_root}health',
             'supported_languages': f'{request.url_root}languages'
@@ -337,19 +322,6 @@ def get_info():
                 'german': '?lang=de',
                 'detect_and_translate': '?lang=es&source=auto'
             }
-        },
-        'summarization_info': {
-            'supported_params': {
-                'prompt': 'Custom instructions for the summary (optional)',
-                'max_length': 'Approximate number of words for the summary (optional)'
-            },
-            'examples': {
-                'basic_summary': '?',
-                'custom_prompt': '?prompt=Enfócate en los aspectos técnicos',
-                'length_limit': '?max_length=50',
-                'combined': '?prompt=Resume las características principales&max_length=100'
-            },
-            'supported_formats': ['text', 'json']
         }
     })
 
@@ -360,131 +332,6 @@ def not_found(error):
 @app.errorhandler(500)
 def internal_error(error):
     return jsonify({'error': 'Internal server error'}), 500
-
-def summarize_content(content, custom_prompt=None, max_length=None):
-    """Genera un resumen del contenido usando Vertex AI"""
-    if not generative_model:
-        return None, "Generative model not available"
-    
-    try:
-        # Crear el prompt base
-        base_prompt = "Por favor, proporciona un resumen claro y conciso del siguiente contenido"
-        
-        # Agregar parámetros opcionales al prompt
-        if max_length:
-            base_prompt += f" en aproximadamente {max_length} palabras"
-        
-        if custom_prompt:
-            base_prompt += f". {custom_prompt}"
-        
-        # Construir el prompt completo
-        full_prompt = f"{base_prompt}:\n\n{content}\n\nResumen:"
-        
-        # Generar el resumen
-        response = generative_model.generate_content(full_prompt)
-        
-        if response.text:
-            return {
-                'summary': response.text.strip(),
-                'original_length': len(content),
-                'summary_length': len(response.text.strip()),
-                'prompt_used': base_prompt
-            }, None
-        else:
-            return None, "No se pudo generar el resumen"
-            
-    except Exception as e:
-        logger.error(f"Error generando resumen: {e}")
-        return None, str(e)
-
-@app.route('/summarize/<path:filename>', methods=['GET'])
-def summarize_file(filename):
-    """Genera un resumen del contenido de un archivo específico"""
-    if not bucket:
-        return jsonify({'error': 'Storage client not configured'}), 500
-    
-    if not generative_model:
-        return jsonify({'error': 'Generative model not configured'}), 500
-    
-    try:
-        blob = bucket.blob(filename)
-        
-        if not blob.exists():
-            return jsonify({'error': f'File {filename} not found'}), 404
-        
-        # Obtener parámetros opcionales
-        custom_prompt = request.args.get('prompt')
-        max_length = request.args.get('max_length')
-        
-        # Validar max_length si se proporciona
-        if max_length:
-            try:
-                max_length = int(max_length)
-                if max_length <= 0:
-                    return jsonify({'error': 'max_length must be a positive integer'}), 400
-            except ValueError:
-                return jsonify({'error': 'max_length must be a valid integer'}), 400
-        
-        # Descargar contenido del archivo
-        content = blob.download_as_text()
-        
-        # Preparar contenido para resumen
-        content_to_summarize = content
-        original_format = 'text'
-        
-        # Si es JSON, extraer el contenido de texto
-        try:
-            json_content = json.loads(content)
-            original_format = 'json'
-            # Convertir JSON a texto legible para el resumen
-            if isinstance(json_content, dict):
-                text_parts = []
-                for key, value in json_content.items():
-                    if isinstance(value, str):
-                        text_parts.append(f"{key}: {value}")
-                    elif isinstance(value, list) and all(isinstance(item, str) for item in value):
-                        text_parts.append(f"{key}: {', '.join(value)}")
-                    else:
-                        text_parts.append(f"{key}: {json.dumps(value)}")
-                content_to_summarize = "\n".join(text_parts)
-            else:
-                content_to_summarize = json.dumps(json_content, indent=2)
-        except json.JSONDecodeError:
-            # No es JSON, usar contenido como texto
-            pass
-        
-        # Verificar que el contenido no esté vacío
-        if not content_to_summarize.strip():
-            return jsonify({'error': 'File content is empty'}), 400
-        
-        # Generar resumen
-        summary_result, error = summarize_content(
-            content_to_summarize, 
-            custom_prompt, 
-            max_length
-        )
-        
-        if error:
-            return jsonify({'error': error}), 500
-        
-        # Preparar respuesta
-        response_data = {
-            'filename': filename,
-            'content_type': blob.content_type,
-            'file_size': blob.size,
-            'original_format': original_format,
-            'summary_info': summary_result,
-            'parameters': {
-                'custom_prompt': custom_prompt,
-                'max_length': max_length
-            }
-        }
-        
-        return jsonify(response_data)
-    
-    except Exception as e:
-        logger.error(f"Error resumiendo archivo {filename}: {e}")
-        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
