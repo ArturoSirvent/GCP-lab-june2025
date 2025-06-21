@@ -1,0 +1,21 @@
+{
+  "service": "GCP Storage API Practice",
+  "version": "1.0.0",
+  "description": "Archivo de información para la práctica de GCP",
+  "created": "2025-06-20",
+  "endpoints": [
+    "/health",
+    "/files",
+    "/file/<filename>",
+    "/upload",
+    "/info"
+  ],
+  "technologies": [
+    "Google Cloud Run",
+    "Google Cloud Storage",
+    "Python Flask",
+    "Docker"
+  ],
+  "author": "Práctica GCP 2025",
+  "status": "active"
+}

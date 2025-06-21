@@ -1,0 +1,18 @@
+{
+  "greeting": "Hello and welcome to our GCP practice!",
+  "description": "This is a multilingual sample file that demonstrates Cloud Translation API integration",
+  "instructions": [
+    "Try accessing this file with different language parameters",
+    "Use ?lang=es for Spanish translation",
+    "Use ?lang=fr for French translation",
+    "Use ?lang=de for German translation"
+  ],
+  "features": [
+    "Automatic language detection",
+    "Multiple target language support", 
+    "JSON content translation",
+    "Text file translation"
+  ],
+  "tips": "You can translate both individual files and direct text using our API endpoints",
+  "contact": "For more information, check the /info endpoint"
+}

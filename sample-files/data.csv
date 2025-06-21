@@ -1,0 +1,8 @@
+region,users,requests,response_time_ms,success_rate
+us-east1,150,2500,120,99.2
+us-central1,200,3200,110,99.5
+us-west1,180,2800,130,98.8
+europe-west1,120,1800,140,99.1
+asia-southeast1,90,1200,160,98.5
+australia-southeast1,60,800,180,99.0
+southamerica-east1,40,600,200,98.2

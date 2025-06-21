@@ -1,0 +1,25 @@
+¡Bienvenido a la práctica de Google Cloud Platform!
+
+Este archivo de texto está almacenado en Google Cloud Storage y está siendo servido a través de una API desplegada en Cloud Run.
+
+Arquitectura de la práctica:
+- Cloud Storage: Almacena este archivo y otros
+- Cloud Run: API que lee archivos del storage
+- Compute Engine: VM desde donde realizamos las peticiones
+- IAM: Gestión de permisos y service accounts
+
+¡Excelente trabajo llegando hasta aquí!
+
+Si puedes leer esto, significa que:
+✅ El bucket de Cloud Storage está configurado correctamente
+✅ La service account tiene los permisos adecuados
+✅ Cloud Run está funcionando y puede acceder al storage
+✅ La VM puede hacer peticiones HTTP a la API
+
+Próximos pasos:
+1. Probar otros archivos (info.json, data.csv)
+2. Revisar los logs en Cloud Run
+3. Experimentar con el endpoint /upload
+4. Prepararse para la Parte 2 de la práctica
+
+¡Sigue así! 🚀
